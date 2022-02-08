@@ -13,7 +13,7 @@ int main()
 {
 	for (int i = 0; i < n_sin + 1; i++)
 	{
-		sins[i] = sin(2 * M_PI / (double)i);
+		sins[i] = sin(2 * i * M_PI / (double)n_sin);
 	}
 
 	for (int i =0; i < n_sin + 1; i++)
