@@ -17,7 +17,9 @@ int main()
 		sum_sin += sins[i];
 	}
 
-	printf("%lf", sum_sin);
+	printf("%lf\n", sum_sin);
 
 	return 0;
 }
+
+
