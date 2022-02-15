@@ -112,7 +112,7 @@ int main(int argc, char *argv[])
 		++iter;
 		error = 0;
 
-#pragma acc kernels present(matrix, new_matrix)
+#pragma acc kernels
 {
 		#pragma acc loop independent collapse(2) reduction(max:error)
 		for (int row_i = 1; row_i < matrix_size - 1; ++row_i)
@@ -120,7 +120,7 @@ int main(int argc, char *argv[])
 			for (int col_i = 1; col_i < matrix_size - 1; ++col_i)
 			{
 				new_matrix[row_i * matrix_size + col_i] = 0.25 * (matrix[(row_i - 1) * matrix_size + col_i] + matrix[(row_i + 1) * matrix_size + col_i] +
-								   								  matrix[row_i * matrix_size + (col_i - 1)] + matrix[row_i * matrix_size + (col_i + 1)]);
+		   								  matrix[row_i * matrix_size + (col_i - 1)] + matrix[row_i * matrix_size + (col_i + 1)]);
 
 				error = fmax(error, new_matrix[row_i * matrix_size + col_i] - matrix[row_i * matrix_size + col_i]);
 			}
