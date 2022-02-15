@@ -102,6 +102,8 @@ int main(int argc, char *argv[])
 
 	interpolation_matrix_sides(matrix, matrix_size);
 
+#pragma acc data copy(matrix[0:matrix_size*matrix_size]) create(new_matrix[0:matrix_size*matrix_size])
+{
 	int iter = 0;
 	double error = 100;
 
@@ -112,6 +114,7 @@ int main(int argc, char *argv[])
 
 #pragma acc kernels
 {
+		#pragma acc loop independent collapse(2) reduction(max:error)
 		for (int row_i = 1; row_i < matrix_size - 1; ++row_i)
 		{
 			for (int col_i = 1; col_i < matrix_size - 1; ++col_i)
@@ -136,6 +139,6 @@ int main(int argc, char *argv[])
 	printf("iter = %d\n", iter);
 	printf("error = %e\n", error);
 	// save_matrix(matrix, matrix_size, "matrix.txt");
-
+}
 	return 0;
 }
