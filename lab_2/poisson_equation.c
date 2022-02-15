@@ -49,6 +49,8 @@ double** get_matrix(int matrix_size)
 
 void interpolation_matrix_sides(double** matrix, int matrix_size)
 {
+#pragma acc kernels
+{ 
 	// left side
 	for (int i = 1; i < matrix_size - 1; ++i)
 	{
@@ -76,6 +78,7 @@ void interpolation_matrix_sides(double** matrix, int matrix_size)
 		matrix[matrix_size - 1][i] = matrix[matrix_size - 1][0] * (matrix_size - 1 - i) / (matrix_size - 1) +
 					                 matrix[matrix_size - 1][matrix_size - 1] * i / (matrix_size - 1);
 	}
+}
 }
 
 int main(int argc, char *argv[])
@@ -105,19 +108,22 @@ int main(int argc, char *argv[])
 
 
 	int iter = 0;
-	double error = 1.0 / 0.0;
+	double error = 100;
 
 	while (error > min_error && iter < iter_max)
 	{
 		++iter;
-		error = 0.0;
+		error = 0;
+
+#pragma acc kernels
+{
 
 		for (int row_i = 1; row_i < matrix_size - 1; ++row_i)
 		{
 			for (int col_i = 1; col_i < matrix_size - 1; ++col_i)
 			{
 				new_matrix[row_i][col_i] = 0.25 * (matrix[row_i - 1][col_i] + matrix[row_i + 1][col_i] +
-												   matrix[row_i][col_i - 1] + matrix[row_i][col_i + 1]);
+								   matrix[row_i][col_i - 1] + matrix[row_i][col_i + 1]);
 
 				error = fmax(error, new_matrix[row_i][col_i] - matrix[row_i][col_i]);
 			}
@@ -130,10 +136,12 @@ int main(int argc, char *argv[])
 				matrix[row_i][col_i] = new_matrix[row_i][col_i];
 			}
 		}
+}
 	}
 	printf("iter = %d\n", iter);
-
+	printf("error = %e\n", error);
 	save_matrix(matrix, matrix_size, "matrix.txt");
 
 	return 0;
 }
+
