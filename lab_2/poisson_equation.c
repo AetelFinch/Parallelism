@@ -21,7 +21,7 @@ void print_matrix(double* matrix, int matrix_size)
 	printf("\n");
 }
 
-void save_matrix(double** matrix, int matrix_size, char* filename)
+void save_matrix(double* matrix, int matrix_size, char* filename)
 {
 	FILE *file = fopen(filename, "w");
 
@@ -29,7 +29,7 @@ void save_matrix(double** matrix, int matrix_size, char* filename)
 	{
 		for (int j = 0; j < matrix_size; ++j)
 		{
-			fprintf(file, "%lf ", matrix[i][j]);
+			fprintf(file, "%lf ", matrix[i * matrix_size + j]);
 		}
 		fprintf(file, "\n");
 	}
@@ -39,7 +39,7 @@ void save_matrix(double** matrix, int matrix_size, char* filename)
 
 double* get_matrix(int matrix_size)
 {
-	double *matrix = (double*)malloc(sizeof(double) * matrix_size * matrix_size);
+	double *matrix = (double*)calloc(sizeof(double), matrix_size * matrix_size);
 	return matrix;
 }
 
@@ -112,17 +112,17 @@ int main(int argc, char *argv[])
 
 #pragma acc kernels
 {
-
 		for (int row_i = 1; row_i < matrix_size - 1; ++row_i)
 		{
 			for (int col_i = 1; col_i < matrix_size - 1; ++col_i)
 			{
-				new_matrix[row_i * matrix_size + col_i] = 0.25 * (matrix[(row_i - 1) * matrix_size + col_i] + matrix[(row_i - 1) * matrix_size + col_i] +
+				new_matrix[row_i * matrix_size + col_i] = 0.25 * (matrix[(row_i - 1) * matrix_size + col_i] + matrix[(row_i + 1) * matrix_size + col_i] +
 								   								  matrix[row_i * matrix_size + (col_i - 1)] + matrix[row_i * matrix_size + (col_i + 1)]);
 
 				error = fmax(error, new_matrix[row_i * matrix_size + col_i] - matrix[row_i * matrix_size + col_i]);
 			}
 		}
+
 
 		for (int row_i = 1; row_i < matrix_size - 1; ++row_i)
 		{
