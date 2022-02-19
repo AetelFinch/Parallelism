@@ -107,6 +107,7 @@ int main(int argc, char *argv[])
 	int iter = 0;
 	double error = 100;
 
+	#pragma data present_or_copy(iter, error)
 	while (error > min_error && iter < iter_max)
 	{
 		++iter;
@@ -114,6 +115,8 @@ int main(int argc, char *argv[])
 
 #pragma acc kernels
 {
+	// #pragma acc data present(matrix, new_matrix)
+	{
 		#pragma acc loop independent collapse(2) reduction(max:error)
 		for (int row_i = 1; row_i < matrix_size - 1; ++row_i)
 		{
@@ -126,7 +129,7 @@ int main(int argc, char *argv[])
 			}
 		}
 
-
+		#pragma acc loop independent collapse(2)
 		for (int row_i = 1; row_i < matrix_size - 1; ++row_i)
 		{
 			for (int col_i = 1; col_i < matrix_size - 1; ++col_i)
@@ -134,6 +137,7 @@ int main(int argc, char *argv[])
 				matrix[row_i * matrix_size + col_i] = new_matrix[row_i * matrix_size + col_i];
 			}
 		}
+	}	
 }
 	}
 	printf("iter = %d\n", iter);

@@ -39,3 +39,8 @@
 
 .local/
 .cache/
+
+.vscode-server/
+.wget-hsts
+.bash_history
+*.save
