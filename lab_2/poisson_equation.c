@@ -32,9 +32,11 @@ double* get_matrix(int matrix_size)
 
 void interpolation_matrix_sides(double* matrix, int matrix_size)
 {
-#pragma acc kernels
+#pragma acc data copy(matrix[0:matrix_size*matrix_size])
+#pragma acc parallel num_gangs(4)
 { 
 	// left side
+	#pragma acc loop
 	for (int i = 1; i < matrix_size - 1; ++i)
 	{
 		matrix[i * matrix_size] = matrix[0] * (matrix_size - 1 - i) / (matrix_size - 1) +
@@ -42,20 +44,23 @@ void interpolation_matrix_sides(double* matrix, int matrix_size)
 	}
 
 	// top side
+	#pragma acc loop
 	for (int i = 1; i < matrix_size - 1; ++i)
 	{
 		matrix[i] = matrix[0] * (matrix_size - 1 - i) / (matrix_size - 1) +
-					   matrix[matrix_size - 1] * i / (matrix_size - 1);
+					matrix[matrix_size - 1] * i / (matrix_size - 1);
 	}
 
 	// right side
+	#pragma acc loop
 	for (int i = 1; i < matrix_size - 1; ++i)
 	{
 		matrix[i * matrix_size + matrix_size - 1] = matrix[matrix_size - 1] * (matrix_size - 1 - i) / (matrix_size - 1) +
-					   				 matrix[(matrix_size - 1) * matrix_size + matrix_size - 1] * i / (matrix_size - 1);
+					   				 				matrix[(matrix_size - 1) * matrix_size + matrix_size - 1] * i / (matrix_size - 1);
 	}
 
 	// bottom side
+	#pragma acc loop
 	for (int i = 1; i < matrix_size - 1; ++i)
 	{
 		matrix[(matrix_size - 1) * matrix_size + i] = matrix[(matrix_size - 1) * matrix_size] * (matrix_size - 1 - i) / (matrix_size - 1) +
@@ -89,17 +94,31 @@ int main(int argc, char *argv[])
 	// create new buffer matrix
 	double *new_matrix = get_matrix(matrix_size);
 
+	new_matrix[0] = 10.0;
+	new_matrix[matrix_size - 1] = 20.0;
+	new_matrix[(matrix_size - 1) * matrix_size] = 20.0;
+	new_matrix[(matrix_size - 1) * matrix_size + matrix_size - 1] = 30.0;
+
+	interpolation_matrix_sides(new_matrix, matrix_size);
+
 	int iter = 0;
 	double error = 100;
 
-#pragma acc data copy(matrix[0:matrix_size*matrix_size]) create(new_matrix[0:matrix_size*matrix_size])
+#pragma acc data copy(matrix[0:matrix_size*matrix_size]) copyin(new_matrix[0:matrix_size*matrix_size],error)
 {
 	while (error > min_error && iter < iter_max)
 	{
 		++iter;
-		error = 0;
+		if (iter % 100 == 0)
+		{
+			#pragma acc kernels
+			error = 0;
+			printf("iter = %d\n", iter);
+		}
 
-		#pragma acc parallel loop independent collapse(2) reduction(max:error)
+		#pragma acc data present(matrix[:matrix_size*matrix_size], new_matrix[:matrix_size*matrix_size])
+		{
+		#pragma acc parallel loop independent collapse(2) reduction(max:error) num_gangs(128)
 		for (int row_i = 1; row_i < matrix_size - 1; ++row_i)
 		{
 			for (int col_i = 1; col_i < matrix_size - 1; ++col_i)
@@ -110,20 +129,18 @@ int main(int argc, char *argv[])
 				error = fmax(error, new_matrix[row_i * matrix_size + col_i] - matrix[row_i * matrix_size + col_i]);
 			}
 		}
-
-		#pragma acc parallel loop independent collapse(2)
-		for (int row_i = 1; row_i < matrix_size - 1; ++row_i)
-		{
-			for (int col_i = 1; col_i < matrix_size - 1; ++col_i)
-			{
-				matrix[row_i * matrix_size + col_i] = new_matrix[row_i * matrix_size + col_i];
-			}
 		}
+
+		double *tmp = matrix;
+		matrix = new_matrix;
+		new_matrix = tmp;
+		
+		#pragma acc update self(error) if(iter % 100 == 0)
 	}
 	printf("iter = %d\n", iter);
 	printf("error = %e\n", error);
 }
-	save_matrix(matrix, matrix_size, "matrix.txt");
+	// save_matrix(matrix, matrix_size, "matrix.txt");
 
 	return 0;
 }
