@@ -32,11 +32,11 @@ double* get_matrix(int matrix_size)
 
 void interpolation_matrix_sides(double* matrix, int matrix_size)
 {
-#pragma acc data copy(matrix[0:matrix_size*matrix_size])
-#pragma acc parallel num_gangs(4)
+// #pragma acc data copy(matrix[0:matrix_size*matrix_size])
+// #pragma acc parallel num_gangs(4)
 { 
 	// left side
-	#pragma acc loop
+	// #pragma acc loop
 	for (int i = 1; i < matrix_size - 1; ++i)
 	{
 		matrix[i * matrix_size] = matrix[0] * (matrix_size - 1 - i) / (matrix_size - 1) +
@@ -44,7 +44,7 @@ void interpolation_matrix_sides(double* matrix, int matrix_size)
 	}
 
 	// top side
-	#pragma acc loop
+	// #pragma acc loop
 	for (int i = 1; i < matrix_size - 1; ++i)
 	{
 		matrix[i] = matrix[0] * (matrix_size - 1 - i) / (matrix_size - 1) +
@@ -52,7 +52,7 @@ void interpolation_matrix_sides(double* matrix, int matrix_size)
 	}
 
 	// right side
-	#pragma acc loop
+	// #pragma acc loop
 	for (int i = 1; i < matrix_size - 1; ++i)
 	{
 		matrix[i * matrix_size + matrix_size - 1] = matrix[matrix_size - 1] * (matrix_size - 1 - i) / (matrix_size - 1) +
@@ -60,7 +60,7 @@ void interpolation_matrix_sides(double* matrix, int matrix_size)
 	}
 
 	// bottom side
-	#pragma acc loop
+	// #pragma acc loop
 	for (int i = 1; i < matrix_size - 1; ++i)
 	{
 		matrix[(matrix_size - 1) * matrix_size + i] = matrix[(matrix_size - 1) * matrix_size] * (matrix_size - 1 - i) / (matrix_size - 1) +
@@ -118,15 +118,30 @@ int main(int argc, char *argv[])
 
 		#pragma acc data present(matrix[:matrix_size*matrix_size], new_matrix[:matrix_size*matrix_size])
 		{
-		#pragma acc parallel loop independent collapse(2) reduction(max:error) num_gangs(128)
-		for (int row_i = 1; row_i < matrix_size - 1; ++row_i)
+		if (iter % 100 == 0)
 		{
-			for (int col_i = 1; col_i < matrix_size - 1; ++col_i)
+			#pragma acc parallel loop independent collapse(2) reduction(max:error) num_gangs(matrix_size)
+			for (int row_i = 1; row_i < matrix_size - 1; ++row_i)
 			{
-				new_matrix[row_i * matrix_size + col_i] = 0.25 * (matrix[(row_i - 1) * matrix_size + col_i] + matrix[(row_i + 1) * matrix_size + col_i] +
-		   								  						  matrix[row_i * matrix_size + (col_i - 1)] + matrix[row_i * matrix_size + (col_i + 1)]);
+				for (int col_i = 1; col_i < matrix_size - 1; ++col_i)
+				{
+					new_matrix[row_i * matrix_size + col_i] = 0.25 * (matrix[(row_i - 1) * matrix_size + col_i] + matrix[(row_i + 1) * matrix_size + col_i] +
+																	matrix[row_i * matrix_size + (col_i - 1)] + matrix[row_i * matrix_size + (col_i + 1)]);
 
-				error = fmax(error, new_matrix[row_i * matrix_size + col_i] - matrix[row_i * matrix_size + col_i]);
+					error = fmax(error, new_matrix[row_i * matrix_size + col_i] - matrix[row_i * matrix_size + col_i]);
+				}
+			}
+		}
+		else
+		{
+			#pragma acc parallel loop independent collapse(2) num_gangs(matrix_size)
+			for (int row_i = 1; row_i < matrix_size - 1; ++row_i)
+			{
+				for (int col_i = 1; col_i < matrix_size - 1; ++col_i)
+				{
+					new_matrix[row_i * matrix_size + col_i] = 0.25 * (matrix[(row_i - 1) * matrix_size + col_i] + matrix[(row_i + 1) * matrix_size + col_i] +
+																	matrix[row_i * matrix_size + (col_i - 1)] + matrix[row_i * matrix_size + (col_i + 1)]);
+				}
 			}
 		}
 		}
