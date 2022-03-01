@@ -44,3 +44,4 @@
 .wget-hsts
 .bash_history
 *.save
+.lesshst
