@@ -100,12 +100,12 @@ int main(int argc, char *argv[])
 
 	int iter = 0;
 	double error = 100;
+	double *new_error = (double*)calloc(sizeof(double), 1);
 
-	cublasStatus_t status;
     cublasHandle_t handle;
     cublasCreate(&handle);
 
-#pragma acc data copy(matrix[0:matrix_size*matrix_size]) copyin(new_matrix[0:matrix_size*matrix_size], error)
+#pragma acc data copy(matrix[0:matrix_size*matrix_size]) copyin(new_matrix[0:matrix_size*matrix_size], error, new_error[0:1])
 {
 	while (error > min_error && iter < iter_max)
 	{
@@ -117,12 +117,11 @@ int main(int argc, char *argv[])
 			printf("iter = %d error = %e\n", iter, error);
 		}
 
-		#pragma acc data present(matrix[:matrix_size*matrix_size], new_matrix[:matrix_size*matrix_size])
+		#pragma acc data present(matrix[:matrix_size*matrix_size], new_matrix[:matrix_size*matrix_size], new_error[0:1])
 		{
 		if (iter % 100 == 0)
 		{
-			int max_idx;
-
+			int max_idx = 0;
 			#pragma acc parallel loop independent collapse(2) num_gangs(matrix_size)
 			for (int row_i = 1; row_i < matrix_size - 1; ++row_i)
 			{
@@ -133,21 +132,16 @@ int main(int argc, char *argv[])
 
 				}
 			}
-			#pragma acc host_data use_device(matrix, new_matrix)
+			#pragma acc host_data use_device(matrix, new_matrix, new_error)
 			{
 				const double alpha = -1;
-				status = cublasDaxpy(handle, matrix_size * matrix_size, &alpha, new_matrix, 1, matrix, 1);
-				status = cublasIdamax(handle, matrix_size * matrix_size, matrix, 1, &max_idx);
-			}
-
-			#pragma acc update self(matrix[max_idx])
-
-				error = -matrix[max_idx - 1];
-
-			#pragma acc host_data use_device(matrix, new_matrix)
-			{
+				cublasDaxpy(handle, matrix_size * matrix_size, &alpha, new_matrix, 1, matrix, 1);
+				cublasIdamax(handle, matrix_size * matrix_size, matrix, 1, &max_idx);
+				cublasDcopy(handle, 1, &(matrix[max_idx - 1]), 1, new_error, 1);
 				cublasDcopy(handle, matrix_size * matrix_size, new_matrix, 1, matrix, 1);
 			}
+			#pragma acc update self(new_error[0:1])
+			error = -new_error[0];
 		}
 		else
 		{
@@ -166,8 +160,6 @@ int main(int argc, char *argv[])
 		double *tmp = matrix;
 		matrix = new_matrix;
 		new_matrix = tmp;
-		
-		// #pragma acc update self(error) if(iter % 100 == 0)
 	}
 	printf("iter = %d\n", iter);
 	printf("error = %e\n", error);
