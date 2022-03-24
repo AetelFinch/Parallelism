@@ -67,6 +67,19 @@ void interpolation_matrix_sides(double* matrix, int matrix_size)
 	}
 }
 
+void print_matrix(double* a, int size)
+{
+    for (int i = 0; i < size; ++i)
+	{
+		for (int j = 0; j < size; ++j)
+		{
+			printf("%lf ", a[i * size + j]);
+		}
+		printf("\n");
+	}
+    printf("\n");
+}
+
 int main(int argc, char *argv[])
 {
 	if (argc == 1)
@@ -129,7 +142,6 @@ int main(int argc, char *argv[])
 				{
 					new_matrix[row_i * matrix_size + col_i] = 0.25 * (matrix[(row_i - 1) * matrix_size + col_i] + matrix[(row_i + 1) * matrix_size + col_i] +
 																	  matrix[row_i * matrix_size + (col_i - 1)] + matrix[row_i * matrix_size + (col_i + 1)]);
-
 				}
 			}
 			#pragma acc host_data use_device(matrix, new_matrix, new_error)
@@ -165,6 +177,8 @@ int main(int argc, char *argv[])
 	printf("error = %e\n", error);
 }
     cublasDestroy(handle);
+
+	print_matrix(matrix, matrix_size);
 
 	// save_matrix(matrix, matrix_size * matrix_size, "test.txt");
 

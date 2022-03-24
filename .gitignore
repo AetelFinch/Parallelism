@@ -45,3 +45,4 @@
 .bash_history
 *.save
 .lesshst
+.nv/
