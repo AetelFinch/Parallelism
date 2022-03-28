@@ -131,10 +131,28 @@ void printCudaMatrix(double* dst, int size)
     printf("\n");
 }
 
+void checkCudaInfo()
+{
+    cudaDeviceProp prop;
+    cudaGetDeviceProperties( &prop, 0);
+
+    printf("major = %d \n", prop.major);
+    printf("warp Size = %d \n", prop.warpSize);
+    printf("max Threads Per Block = %d \n", prop.maxThreadsPerBlock);
+    printf("max Threads Per MultiProcessor = %d \n", prop.maxThreadsPerMultiProcessor);
+    printf("multiProcessor Count = %d \n", prop.multiProcessorCount);
+    printf("shared Memory Per Block (bytes) = %lu \n", prop.sharedMemPerBlock);
+    printf("max Grid Size by X = %d \n", prop.maxGridSize[0]);
+    printf("max Grid Size by Y = %d \n", prop.maxGridSize[1]);
+
+    printf("\n");
+}
+
 int main(int argc, char *argv[])
 {
     if (argc == 1)
 	{
+        checkCudaInfo();
 		print_help();
 		exit(0);
 	}
