@@ -1,8 +1,8 @@
-all: res
+all: compile profile
 
-res: cuda_poisson.cu
+compile:
 	nvcc cuda_poisson.cu -arch sm_70
 
-prof: ./a.out
+profile:
 	nsys profile -o prof -f true -t cuda ./a.out 0.000001 128 150
 	nsys stats prof.nsys-rep

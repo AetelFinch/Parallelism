@@ -3,6 +3,8 @@
 #include <cuda_runtime.h>
 #include <cub/cub.cuh>
 
+#define BLOCK_DIM 16
+
 #define CUDACHKERR(err) if (err != cudaSuccess) { \
     fprintf(stderr, \
             "Failed to copy vector B from host to device (error code %s)!\n", \
@@ -73,17 +75,46 @@ __global__ void vecNeg(const double *newA, const double *A, double* ans, int num
 
 __global__ void evalEquation(double *newA, const double *A, int numElements)
 {
+    __shared__ double temp[BLOCK_DIM + 2][BLOCK_DIM + 2];
+
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     int idy = blockIdx.y * blockDim.y + threadIdx.y;
 
+    if (idx < numElements && idy < numElements)
+    {
+    	temp[threadIdx.y + 1][threadIdx.x + 1] = A[idy * numElements + idx];
+
+        if (threadIdx.x == (BLOCK_DIM - 1))
+        {
+            temp[threadIdx.y + 1][threadIdx.x + 2] = A[idy * numElements + idx + 1];
+        }
+
+        if (threadIdx.x == 0)
+        {
+            temp[threadIdx.y + 1][threadIdx.x] = A[idy * numElements + idx - 1];
+        }
+
+        if (threadIdx.y == (BLOCK_DIM - 1))
+        {
+            temp[threadIdx.y + 2][threadIdx.x + 1] = A[(idy + 1) * numElements + idx];
+        }
+
+        if (threadIdx.y == 0)
+        {
+            temp[threadIdx.y][threadIdx.x + 1] = A[(idy - 1) * numElements + idx];
+        }
+    }
+
+    __syncthreads();
+
     if ((0 < idx && idx < numElements - 1) && (0 < idy && idy < numElements - 1))
     {
-        newA[idy * numElements + idx] = 0.25 * (A[(idy - 1) * numElements + idx] + A[(idy + 1) * numElements + idx] +
-											    A[idy * numElements + (idx - 1)] + A[idy * numElements + (idx + 1)]);
+        newA[idy * numElements + idx] = 0.25 * (temp[threadIdx.y + 2][threadIdx.x + 1] + temp[threadIdx.y + 1][threadIdx.x] +
+											    temp[threadIdx.y][threadIdx.x + 1] + temp[threadIdx.y + 1][threadIdx.x + 2]);
     }
 }
 
-void print_matrix(double* dst, int size)
+void printCudaMatrix(double* dst, int size)
 {
     double *a = (double*)calloc(sizeof(double), size * size);
 
@@ -130,8 +161,8 @@ int main(int argc, char *argv[])
     int iter = 0;
 	double error = 10;
 
-    dim3 GS = dim3(32, 32);
-    dim3 BS = dim3(ceil(matrix_size / (double)GS.x), ceil(matrix_size / (double)GS.y));
+    dim3 BS = dim3(BLOCK_DIM, BLOCK_DIM);
+    dim3 GS = dim3(ceil(matrix_size / (double)BS.x), ceil(matrix_size / (double)BS.y));
 
     void *d_temp_storage = NULL;
     size_t temp_storage_bytes = 0;
@@ -143,6 +174,9 @@ int main(int argc, char *argv[])
     cub::DeviceReduce::Max(d_temp_storage, temp_storage_bytes, tmp_d, max_d, matrix_size * matrix_size);
     cudaMalloc(&d_temp_storage, temp_storage_bytes);
 
+    int BS_neg = matrix_size;
+    int GS_neg = ceil(matrix_size * matrix_size / (double)BS_neg);
+
     while (error > min_error && iter < iter_max)
     {
         ++iter;
@@ -151,21 +185,27 @@ int main(int argc, char *argv[])
 			printf("iter = %d error = %e\n", iter, error);
 			error = 0;
 
-            evalEquation<<<BS, GS>>>(newA_d, A_d, matrix_size);
+            evalEquation<<<GS, BS>>>(newA_d, A_d, matrix_size);
 
-            int GS_neg = matrix_size;
-            int BS_neg = ceil(matrix_size * matrix_size / (double)GS_neg);
+            // printCudaMatrix(newA_d, matrix_size);
 
-            vecNeg<<<BS_neg, GS_neg>>>(newA_d, A_d, tmp_d, matrix_size * matrix_size);
+            vecNeg<<<GS_neg, BS_neg>>>(newA_d, A_d, tmp_d, matrix_size * matrix_size);
             err = cub::DeviceReduce::Max(d_temp_storage, temp_storage_bytes, tmp_d, max_d, matrix_size * matrix_size);
             CUDACHKERR(err);
 
+            // printf("1\n");
+
             err = cudaMemcpy(&error, max_d, sizeof(double), cudaMemcpyDeviceToHost);
             CUDACHKERR(err);
+
+            // printf("2\n");
         }
         else
         {
-            evalEquation<<<BS, GS>>>(newA_d, A_d, matrix_size);
+            // printCudaMatrix(newA_d, matrix_size);
+            evalEquation<<<GS, BS>>>(newA_d, A_d, matrix_size);
+            // printCudaMatrix(newA_d, matrix_size);
+
         }
 
         double *tmp = A_d;
