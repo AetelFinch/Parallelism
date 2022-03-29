@@ -4,6 +4,7 @@
 #include <cub/cub.cuh>
 
 #define BLOCK_DIM 16
+#define BLOCK_VEC_DIM 256
 
 #define CUDACHKERR(err) if (err != cudaSuccess) { \
     fprintf(stderr, \
@@ -18,7 +19,7 @@ void print_help()
 	printf("{min_error} {matrix_size} {iter_max}\n");
 }
 
-double* getSetMatrix(double* dst, int size)
+double* getSetMatrix(double* dst, int size, cudaStream_t stream)
 {
     cudaError_t err;
 
@@ -26,7 +27,7 @@ double* getSetMatrix(double* dst, int size)
     err = cudaMalloc(&matrix, size * size * sizeof(double));
     CUDACHKERR(err);
 
-    err = cudaMemcpy(matrix, dst, size * size * sizeof(double), cudaMemcpyHostToDevice);
+    err = cudaMemcpyAsync(matrix, dst, size * size * sizeof(double), cudaMemcpyHostToDevice, stream);
     CUDACHKERR(err);
 
 	return matrix;
@@ -75,42 +76,13 @@ __global__ void vecNeg(const double *newA, const double *A, double* ans, int num
 
 __global__ void evalEquation(double *newA, const double *A, int numElements)
 {
-    __shared__ double temp[BLOCK_DIM + 2][BLOCK_DIM + 2];
-
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     int idy = blockIdx.y * blockDim.y + threadIdx.y;
-
-    if (idx < numElements && idy < numElements)
-    {
-    	temp[threadIdx.y + 1][threadIdx.x + 1] = A[idy * numElements + idx];
-
-        if (threadIdx.x == (BLOCK_DIM - 1))
-        {
-            temp[threadIdx.y + 1][threadIdx.x + 2] = A[idy * numElements + idx + 1];
-        }
-
-        if (threadIdx.x == 0)
-        {
-            temp[threadIdx.y + 1][threadIdx.x] = A[idy * numElements + idx - 1];
-        }
-
-        if (threadIdx.y == (BLOCK_DIM - 1))
-        {
-            temp[threadIdx.y + 2][threadIdx.x + 1] = A[(idy + 1) * numElements + idx];
-        }
-
-        if (threadIdx.y == 0)
-        {
-            temp[threadIdx.y][threadIdx.x + 1] = A[(idy - 1) * numElements + idx];
-        }
-    }
-
-    __syncthreads();
-
+    
     if ((0 < idx && idx < numElements - 1) && (0 < idy && idy < numElements - 1))
     {
-        newA[idy * numElements + idx] = 0.25 * (temp[threadIdx.y + 2][threadIdx.x + 1] + temp[threadIdx.y + 1][threadIdx.x] +
-											    temp[threadIdx.y][threadIdx.x + 1] + temp[threadIdx.y + 1][threadIdx.x + 2]);
+        newA[idy * numElements + idx] = 0.25 * (A[(idy - 1) * numElements + idx] + A[(idy + 1) * numElements + idx] +
+											    A[idy * numElements + (idx - 1)] + A[idy * numElements + (idx + 1)]);
     }
 }
 
@@ -162,6 +134,8 @@ int main(int argc, char *argv[])
 	int iter_max = atoi(argv[3]);
 
     cudaError_t err;
+    cudaStream_t stream;
+    cudaStreamCreate(&stream);
 
     double *tmp = (double*)calloc(sizeof(double), matrix_size * matrix_size);
 
@@ -172,8 +146,8 @@ int main(int argc, char *argv[])
 
     interpolationMatrixSides(tmp, matrix_size);
 
-    double *A_d = getSetMatrix(tmp, matrix_size);
-	double *newA_d = getSetMatrix(tmp, matrix_size);
+    double *A_d = getSetMatrix(tmp, matrix_size, stream);
+	double *newA_d = getSetMatrix(tmp, matrix_size, stream);
     free(tmp);
 
     int iter = 0;
@@ -192,38 +166,25 @@ int main(int argc, char *argv[])
     cub::DeviceReduce::Max(d_temp_storage, temp_storage_bytes, tmp_d, max_d, matrix_size * matrix_size);
     cudaMalloc(&d_temp_storage, temp_storage_bytes);
 
-    int BS_neg = matrix_size;
+    int BS_neg = BLOCK_VEC_DIM;
     int GS_neg = ceil(matrix_size * matrix_size / (double)BS_neg);
 
     while (error > min_error && iter < iter_max)
     {
         ++iter;
+        evalEquation<<<GS, BS>>>(newA_d, A_d, matrix_size);
+
         if (iter % 100 == 0)
 		{
 			printf("iter = %d error = %e\n", iter, error);
 			error = 0;
 
-            evalEquation<<<GS, BS>>>(newA_d, A_d, matrix_size);
-
-            // printCudaMatrix(newA_d, matrix_size);
-
             vecNeg<<<GS_neg, BS_neg>>>(newA_d, A_d, tmp_d, matrix_size * matrix_size);
             err = cub::DeviceReduce::Max(d_temp_storage, temp_storage_bytes, tmp_d, max_d, matrix_size * matrix_size);
             CUDACHKERR(err);
 
-            // printf("1\n");
-
-            err = cudaMemcpy(&error, max_d, sizeof(double), cudaMemcpyDeviceToHost);
+            err = cudaMemcpyAsync(&error, max_d, sizeof(double), cudaMemcpyDeviceToHost, stream);
             CUDACHKERR(err);
-
-            // printf("2\n");
-        }
-        else
-        {
-            // printCudaMatrix(newA_d, matrix_size);
-            evalEquation<<<GS, BS>>>(newA_d, A_d, matrix_size);
-            // printCudaMatrix(newA_d, matrix_size);
-
         }
 
         double *tmp = A_d;
