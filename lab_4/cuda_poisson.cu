@@ -11,7 +11,7 @@
             "Failed to copy vector B from host to device (error code %s)!\n", \
             cudaGetErrorString(err)); \
     exit(EXIT_FAILURE); \
-  }
+    }
 
 void print_help()
 {
@@ -19,7 +19,7 @@ void print_help()
 	printf("{min_error} {matrix_size} {iter_max}\n");
 }
 
-double* getSetMatrix(double* dst, int size, cudaStream_t stream)
+double* getSetMatrix(double* dst, int size)
 {
     cudaError_t err;
 
@@ -27,7 +27,7 @@ double* getSetMatrix(double* dst, int size, cudaStream_t stream)
     err = cudaMalloc(&matrix, size * size * sizeof(double));
     CUDACHKERR(err);
 
-    err = cudaMemcpyAsync(matrix, dst, size * size * sizeof(double), cudaMemcpyHostToDevice, stream);
+    err = cudaMemcpy(matrix, dst, size * size * sizeof(double), cudaMemcpyHostToDevice);
     CUDACHKERR(err);
 
 	return matrix;
@@ -76,13 +76,33 @@ __global__ void vecNeg(const double *newA, const double *A, double* ans, int num
 
 __global__ void evalEquation(double *newA, const double *A, int numElements)
 {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    int idy = blockIdx.y * blockDim.y + threadIdx.y;
+    __shared__ double temp[BLOCK_DIM][BLOCK_DIM];
     
-    if ((0 < idx && idx < numElements - 1) && (0 < idy && idy < numElements - 1))
+    int idx = blockIdx.x * blockDim.x + threadIdx.x - blockIdx.x * 2;
+    int idy = blockIdx.y * blockDim.y + threadIdx.y - blockIdx.y * 2;
+
+    if (idx < numElements && idy < numElements)
     {
-        newA[idy * numElements + idx] = 0.25 * (A[(idy - 1) * numElements + idx] + A[(idy + 1) * numElements + idx] +
-											    A[idy * numElements + (idx - 1)] + A[idy * numElements + (idx + 1)]);
+        temp[threadIdx.y][threadIdx.x] = A[idy * numElements + idx];
+
+        // temp[threadIdx.y][threadIdx.x] = A[(idy - 1) * numElements + idx - 1];
+        // temp[threadIdx.y + 2][threadIdx.x + 2] = A[(idy + 1) * numElements + idx + 1];
+        // temp[threadIdx.y + 2][threadIdx.x] = A[(idy + 1) * numElements + idx - 1];
+        // temp[threadIdx.y][threadIdx.x + 2] = A[(idy - 1) * numElements + idx + 1];
+    }
+
+    __syncthreads();
+    
+    if ((0 < idx && idx < numElements - 1) && (0 < idy && idy < numElements - 1) && (0 < threadIdx.x && threadIdx.x < blockDim.x - 1) && (0 < threadIdx.y && threadIdx.y < blockDim.y - 1))
+    {
+        newA[idy * numElements + idx] = 0.25 * (temp[threadIdx.y - 1][threadIdx.x] + temp[threadIdx.y][threadIdx.x + 1] + 
+                                                temp[threadIdx.y + 1][threadIdx.x] + temp[threadIdx.y][threadIdx.x - 1]);
+        // newA[idy * numElements + idx] = 0.25 * (A[(idy - 1) * numElements + idx] + A[(idy + 1) * numElements + idx] +
+		// 									    A[idy * numElements + (idx - 1)] + A[idy * numElements + (idx + 1)]);
+        // newA[idy * numElements + idx] = 0.25 * (temp[threadIdx.y][threadIdx.x] + temp[threadIdx.y + 2][threadIdx.x + 2] +
+		// 									    temp[threadIdx.y + 2][threadIdx.x] + temp[threadIdx.y][threadIdx.x + 2]);
+        // newA[idy * numElements + idx] = 0.25 * (temp[threadIdx.y + 2][threadIdx.x + 1] + temp[threadIdx.y + 1][threadIdx.x] +
+		// 									    temp[threadIdx.y][threadIdx.x + 1] + temp[threadIdx.y + 1][threadIdx.x + 2]);
     }
 }
 
@@ -134,8 +154,8 @@ int main(int argc, char *argv[])
 	int iter_max = atoi(argv[3]);
 
     cudaError_t err;
-    cudaStream_t stream;
-    cudaStreamCreate(&stream);
+    // cudaStream_t stream;
+    // cudaStreamCreate(&stream);
 
     double *tmp = (double*)calloc(sizeof(double), matrix_size * matrix_size);
 
@@ -146,15 +166,17 @@ int main(int argc, char *argv[])
 
     interpolationMatrixSides(tmp, matrix_size);
 
-    double *A_d = getSetMatrix(tmp, matrix_size, stream);
-	double *newA_d = getSetMatrix(tmp, matrix_size, stream);
+    double *A_d = getSetMatrix(tmp, matrix_size);
+	double *newA_d = getSetMatrix(tmp, matrix_size);
     free(tmp);
 
     int iter = 0;
 	double error = 10;
 
     dim3 BS = dim3(BLOCK_DIM, BLOCK_DIM);
-    dim3 GS = dim3(ceil(matrix_size / (double)BS.x), ceil(matrix_size / (double)BS.y));
+
+    int gs_size = ceil(((double)matrix_size - BLOCK_DIM + 1) / (BLOCK_DIM - 2));
+    dim3 GS = dim3(gs_size, gs_size);
 
     void *d_temp_storage = NULL;
     size_t temp_storage_bytes = 0;
@@ -183,7 +205,7 @@ int main(int argc, char *argv[])
             err = cub::DeviceReduce::Max(d_temp_storage, temp_storage_bytes, tmp_d, max_d, matrix_size * matrix_size);
             CUDACHKERR(err);
 
-            err = cudaMemcpyAsync(&error, max_d, sizeof(double), cudaMemcpyDeviceToHost, stream);
+            err = cudaMemcpy(&error, max_d, sizeof(double), cudaMemcpyDeviceToHost);
             CUDACHKERR(err);
         }
 
