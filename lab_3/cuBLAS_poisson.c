@@ -178,8 +178,6 @@ int main(int argc, char *argv[])
 }
     cublasDestroy(handle);
 
-	print_matrix(matrix, matrix_size);
-
 	// save_matrix(matrix, matrix_size * matrix_size, "test.txt");
 
     return 0;

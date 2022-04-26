@@ -46,3 +46,5 @@
 *.save
 .lesshst
 .nv/
+
+commands.txt
