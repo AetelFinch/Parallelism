@@ -170,7 +170,7 @@ int main(int argc, char *argv[])
     int BS_neg = BLOCK_VEC_DIM;
     int GS_neg = ceil(matrix_size * matrix_size / (double)BS_neg);
 
-    bool graphCreated=false;
+    bool graphCreated = false;
     cudaGraph_t graph;
     cudaGraphExec_t instance;
 
@@ -191,7 +191,7 @@ int main(int argc, char *argv[])
             }
             cudaStreamEndCapture(stream, &graph);
             cudaGraphInstantiate(&instance, graph, NULL, NULL, 0);
-            graphCreated=true;
+            graphCreated = true;
         }
         err = cudaGraphLaunch(instance, stream);
         CUDACHKERR(err);
