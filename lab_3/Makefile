@@ -1,4 +1,4 @@
-all: res
+all: compile
 
-res: cuBLAS_poisson.c
+compile:
 	pgcc cuBLAS_poisson.c -acc -Minfo=accel -ta=nvidia -cudalib=cublas

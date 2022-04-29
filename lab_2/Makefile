@@ -1,4 +1,4 @@
-all: res
+all: compile
 
-res: poisson_equation.c
+compile:
 	pgcc poisson_equation.c -acc -Minfo=accel -ta=nvidia
