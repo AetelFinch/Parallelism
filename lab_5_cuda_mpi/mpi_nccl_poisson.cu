@@ -16,20 +16,20 @@
 
 void print_help()
 {
-	printf("usage:\n");
-	printf("{min_error} {matrix_size} {iter_max}\n");
+    printf("usage:\n");
+    printf("{min_error} {matrix_size} {iter_max}\n");
 }
 
 void printMatrix(double* a, int height, int width)
 {
     for (int i = 0; i < height; ++i)
-	{
-		for (int j = 0; j < width; ++j)
-		{
-			printf("%lf ", a[i * width + j]);
-		}
-		printf("\n");
-	}
+    {
+        for (int j = 0; j < width; ++j)
+        {
+            printf("%lf ", a[i * width + j]);
+        }
+        printf("\n");
+    }
     printf("\n");
 }
 
@@ -40,14 +40,16 @@ void printCudaMatrix(double* dst, int height, int width)
     cudaMemcpy(a, dst, height * width * sizeof(double), cudaMemcpyDeviceToHost);
 
     for (int i = 0; i < height; ++i)
-	{
-		for (int j = 0; j < width; ++j)
-		{
-			printf("%lf ", a[i * width + j]);
-		}
-		printf("\n");
-	}
+    {
+        for (int j = 0; j < width; ++j)
+        {
+            printf("%lf ", a[i * width + j]);
+        }
+        printf("\n");
+    }
     printf("\n");
+
+    free(a);
 }
 
 void setDevice(int rank)
@@ -115,9 +117,9 @@ void interpolateHorizontal(double* arr, double leftValue, double rightValue, int
 void interpolateVertical(double* arr, double topValue, double bottomValue, int startPos, int yPos, int numRows, int mx_size)
 {
     for (int i = 0; i < numRows; ++i)
-	{
-		arr[i * mx_size + startPos] = (topValue * (mx_size - 1 - i - yPos) + bottomValue * (i + yPos)) / (mx_size - 1);
-	}
+    {
+        arr[i * mx_size + startPos] = (topValue * (mx_size - 1 - i - yPos) + bottomValue * (i + yPos)) / (mx_size - 1);
+    }
 }
 
 double* getSetMatrix(double* dst, int numElems, int matrix_size, cudaStream_t stream)
@@ -138,7 +140,7 @@ double* getSetMatrix(double* dst, int numElems, int matrix_size, cudaStream_t st
     CUDACHKERR(err);
 
     free(zeroMx);
-	return matrix;
+    return matrix;
 }
 
 __global__ void evalEquation(double *newA, const double *A, int width, int y_start, int y_end)
@@ -149,7 +151,7 @@ __global__ void evalEquation(double *newA, const double *A, int width, int y_sta
     if ((0 < idx && idx < width - 1) && (y_start < idy && idy < y_end))
     {
         newA[idy * width + idx] = 0.25 * (A[(idy - 1) * width + idx] + A[(idy + 1) * width + idx] +
-											    A[idy * width + (idx - 1)] + A[idy * width + (idx + 1)]);
+                                          A[idy * width + (idx - 1)] + A[idy * width + (idx + 1)]);
     }
 }
 
@@ -166,17 +168,17 @@ __global__ void vecNeg(const double *newA, const double *A, double* ans, int mx_
 int main(int argc, char *argv[])
 {
     if (argc == 1)
-	{
-		print_help();
-		exit(0);
-	}
+    {
+        print_help();
+        exit(0);
+    }
 
     int local_rank, numProcess;
     MPI_Init(&argc, &argv);
 
-	double min_error = atof(argv[1]);
-	int matrix_size = atoi(argv[2]);
-	int iter_max = atoi(argv[3]);
+    double min_error = atof(argv[1]);
+    int matrix_size = atoi(argv[2]);
+    int iter_max = atoi(argv[3]);
 
     MPI_Comm_rank(MPI_COMM_WORLD, &local_rank);
     MPI_Comm_size(MPI_COMM_WORLD, &numProcess);
@@ -288,8 +290,8 @@ int main(int argc, char *argv[])
         }
         
         double *tmp = A_d;
-		A_d = newA_d;
-		newA_d = tmp;
+        A_d = newA_d;
+        newA_d = tmp;
     }
 
     cudaFree(A_d);
