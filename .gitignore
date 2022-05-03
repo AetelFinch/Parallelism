@@ -48,3 +48,5 @@
 .nv/
 
 commands.txt
+*.sqlite
+*.nsys-rep
