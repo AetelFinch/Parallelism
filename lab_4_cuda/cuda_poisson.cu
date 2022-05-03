@@ -15,53 +15,53 @@
 
 void print_help()
 {
-	printf("usage:\n");
-	printf("{min_error} {matrix_size} {iter_max}\n");
+    printf("usage:\n");
+    printf("{min_error} {matrix_size} {iter_max}\n");
 }
 
 double* getSetMatrix(double* dst, int size, cudaStream_t stream)
 {
     cudaError_t err;
 
-	double *matrix;
+    double *matrix;
     err = cudaMalloc(&matrix, size * size * sizeof(double));
     CUDACHKERR(err);
 
     err = cudaMemcpyAsync(matrix, dst, size * size * sizeof(double), cudaMemcpyHostToDevice, stream);
     CUDACHKERR(err);
 
-	return matrix;
+    return matrix;
 }
 
 void interpolationMatrixSides(double* matrix, int matrix_size)
 {
-	// left side
-	for (int i = 1; i < matrix_size - 1; ++i)
-	{
-		matrix[i * matrix_size] = matrix[0] * (matrix_size - 1 - i) / (matrix_size - 1) +
-					   			  matrix[matrix_size * (matrix_size - 1)] * i / (matrix_size - 1);
-	}
+    // left side
+    for (int i = 1; i < matrix_size - 1; ++i)
+    {
+        matrix[i * matrix_size] = matrix[0] * (matrix_size - 1 - i) / (matrix_size - 1) +
+                                     matrix[matrix_size * (matrix_size - 1)] * i / (matrix_size - 1);
+    }
 
-	// top side
-	for (int i = 1; i < matrix_size - 1; ++i)
-	{
-		matrix[i] = matrix[0] * (matrix_size - 1 - i) / (matrix_size - 1) +
-					matrix[matrix_size - 1] * i / (matrix_size - 1);
-	}
+    // top side
+    for (int i = 1; i < matrix_size - 1; ++i)
+    {
+        matrix[i] = matrix[0] * (matrix_size - 1 - i) / (matrix_size - 1) +
+                    matrix[matrix_size - 1] * i / (matrix_size - 1);
+    }
 
-	// right side
-	for (int i = 1; i < matrix_size - 1; ++i)
-	{
-		matrix[i * matrix_size + matrix_size - 1] = matrix[matrix_size - 1] * (matrix_size - 1 - i) / (matrix_size - 1) +
-					   				 				matrix[(matrix_size - 1) * matrix_size + matrix_size - 1] * i / (matrix_size - 1);
-	}
+    // right side
+    for (int i = 1; i < matrix_size - 1; ++i)
+    {
+        matrix[i * matrix_size + matrix_size - 1] = matrix[matrix_size - 1] * (matrix_size - 1 - i) / (matrix_size - 1) +
+                                                        matrix[(matrix_size - 1) * matrix_size + matrix_size - 1] * i / (matrix_size - 1);
+    }
 
-	// bottom side
-	for (int i = 1; i < matrix_size - 1; ++i)
-	{
-		matrix[(matrix_size - 1) * matrix_size + i] = matrix[(matrix_size - 1) * matrix_size] * (matrix_size - 1 - i) / (matrix_size - 1) +
-					                 				  matrix[(matrix_size - 1) * matrix_size + matrix_size - 1] * i / (matrix_size - 1);
-	}
+    // bottom side
+    for (int i = 1; i < matrix_size - 1; ++i)
+    {
+        matrix[(matrix_size - 1) * matrix_size + i] = matrix[(matrix_size - 1) * matrix_size] * (matrix_size - 1 - i) / (matrix_size - 1) +
+                                                       matrix[(matrix_size - 1) * matrix_size + matrix_size - 1] * i / (matrix_size - 1);
+    }
 }
 
 __global__ void vecNeg(const double *newA, const double *A, double* ans, int numElements)
@@ -82,7 +82,7 @@ __global__ void evalEquation(double *newA, const double *A, int numElements)
     if ((0 < idx && idx < numElements - 1) && (0 < idy && idy < numElements - 1))
     {
         newA[idy * numElements + idx] = 0.25 * (__ldg(&A[(idy - 1) * numElements + idx]) + __ldg(&A[(idy + 1) * numElements + idx]) +
-											    __ldg(&A[idy * numElements + (idx - 1)]) + __ldg(&A[idy * numElements + (idx + 1)]));
+                                                __ldg(&A[idy * numElements + (idx - 1)]) + __ldg(&A[idy * numElements + (idx + 1)]));
     }
 }
 
@@ -93,14 +93,16 @@ void printCudaMatrix(double* dst, int size)
     cudaMemcpy(a, dst, size * size * sizeof(double), cudaMemcpyDeviceToHost);
 
     for (int i = 0; i < size; ++i)
-	{
-		for (int j = 0; j < size; ++j)
-		{
-			printf("%lf ", a[i * size + j]);
-		}
-		printf("\n");
-	}
+    {
+        for (int j = 0; j < size; ++j)
+        {
+            printf("%lf ", a[i * size + j]);
+        }
+        printf("\n");
+    }
     printf("\n");
+
+    free(a);
 }
 
 void checkCudaInfo()
@@ -123,15 +125,15 @@ void checkCudaInfo()
 int main(int argc, char *argv[])
 {
     if (argc == 1)
-	{
+    {
         checkCudaInfo();
-		print_help();
-		exit(0);
-	}
+        print_help();
+        exit(0);
+    }
 
-	double min_error = atof(argv[1]);
-	int matrix_size = atoi(argv[2]);
-	int iter_max = atoi(argv[3]);
+    double min_error = atof(argv[1]);
+    int matrix_size = atoi(argv[2]);
+    int iter_max = atoi(argv[3]);
 
     cudaError_t err;
     cudaStream_t stream;
@@ -140,18 +142,18 @@ int main(int argc, char *argv[])
     double *tmp = (double*)calloc(sizeof(double), matrix_size * matrix_size);
 
     tmp[0] = 10.0;
-	tmp[matrix_size - 1] = 20.0;
-	tmp[(matrix_size - 1) * matrix_size] = 20.0;
-	tmp[(matrix_size - 1) * matrix_size + matrix_size - 1] = 30.0;
+    tmp[matrix_size - 1] = 20.0;
+    tmp[(matrix_size - 1) * matrix_size] = 20.0;
+    tmp[(matrix_size - 1) * matrix_size + matrix_size - 1] = 30.0;
 
     interpolationMatrixSides(tmp, matrix_size);
 
     double *A_d = getSetMatrix(tmp, matrix_size, stream);
-	double *newA_d = getSetMatrix(tmp, matrix_size, stream);
+    double *newA_d = getSetMatrix(tmp, matrix_size, stream);
     free(tmp);
 
     int iter = 0;
-	double error = 10;
+    double error = 10;
 
     dim3 BS = dim3(BLOCK_DIM, BLOCK_DIM);
 
@@ -201,9 +203,9 @@ int main(int argc, char *argv[])
         iter += 100;
 
         if (iter % 100 == 0)
-		{
-			printf("iter = %d error = %e\n", iter, error);
-			error = 0;
+        {
+            printf("iter = %d error = %e\n", iter, error);
+            error = 0;
 
             tmp = A_d;
             A_d = newA_d;
