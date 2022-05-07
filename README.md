@@ -1,4 +1,4 @@
-# Parallels
+# Parallelism
 
 Repository that contains the code for university course "Theory of Parallelism".
 
