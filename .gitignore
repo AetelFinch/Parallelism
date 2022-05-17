@@ -51,3 +51,5 @@ commands.txt
 *.sqlite
 *.nsys-rep
 .gitconfig
+*.pth
+.vscode/
