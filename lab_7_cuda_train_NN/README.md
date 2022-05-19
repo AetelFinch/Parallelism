@@ -1,10 +1,10 @@
-# Neural network training (inference)
+# Neural network training (inference+back propagation)
 
 ## task
 
-Write a CUDA program implementing a simple neural network
+Implement a CUDA neural network that will classify two numbers (1 and 8). 
 
-Implement recalculation of values from layer to layer via calls from cuBLAS, cuDNN libraries
+Implement recalculation of values from layer to layer via calls from cuBLAS libraries.
 
 ## compilation
 

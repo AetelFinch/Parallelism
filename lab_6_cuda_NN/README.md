@@ -4,7 +4,7 @@
 
 Write a CUDA program implementing a simple neural network
 
-Implement recalculation of values from layer to layer via calls from cuBLAS, cuDNN libraries
+Implement recalculation of values from layer to layer via calls from cuBLAS libraries
 
 ## compilation
 
