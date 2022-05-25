@@ -49,7 +49,7 @@ int main()
 
     std::cout << "initialization completed\n";
 
-    int num_epochs = 10000;
+    int num_epochs = 1000;
     for (int epoch = 1; epoch <= num_epochs; ++epoch)
     {
         float sum_losses = 0;
